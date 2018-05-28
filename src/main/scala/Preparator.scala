@@ -8,23 +8,22 @@ import org.apache.spark.SparkContext._
 import org.apache.spark.mllib.feature.{IDF, IDFModel, HashingTF}
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
 
-import org.apache.lucene.analysis.standard.StandardAnalyzer
-import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
-
-import java.io.StringReader
-
-import scala.collection.mutable
+import org.ansj.recognition.impl.StopRecognition
+import org.ansj.splitWord.analysis.ToAnalysis
+import collection.JavaConverters._
+import scala.collection.mutable.ArrayBuffer
 
 /** Define Preparator parameters. Recall that for our data
   * representation we are only required to input the n-gram window
   * components.
   */
 case class PreparatorParams(
-  nGram: Int,
-  numFeatures: Int = 15000
+  numFeatures: Int = 15000,
+  contentLengthLimit: Int = 500
 ) extends Params
 
 /** define your Preparator class */
@@ -33,7 +32,7 @@ class Preparator(pp: PreparatorParams)
 
   def prepare(sc: SparkContext, td: TrainingData): PreparedData = {
 
-    val tfHasher = new TFHasher(pp.numFeatures, pp.nGram, td.stopWords)
+    val tfHasher = new TFHasher(pp.numFeatures, pp.contentLengthLimit, td.stopWords)
 
     // Convert trainingdata's observation text into TF vector
     // and then fit a IDF model
@@ -48,7 +47,7 @@ class Preparator(pp: PreparatorParams)
     val doc: RDD[(Double, String)] = td.data.map (obs => (obs.label, obs.text))
 
     // transform RDD[(Label, text)] to RDD[LabeledPoint]
-    val transformedData: RDD[(LabeledPoint)] = tfIdfModel.transform(doc)
+    val transformedData: RDD[LabeledPoint] = tfIdfModel.transform(doc)
 
     // Finally extract category map, associating label to category.
     val categoryMap = td.data.map(obs => (obs.label, obs.category)).collectAsMap.toMap
@@ -64,39 +63,25 @@ class Preparator(pp: PreparatorParams)
 
 class TFHasher(
   val numFeatures: Int,
-  val nGram: Int,
+  val contentLengthLimit: Int,
   val stopWords:Set[String]
 ) extends Serializable {
 
+  private val filter = new StopRecognition()
+  filter.insertStopWords(stopWords.asJavaCollection)
+
   private val hasher = new HashingTF(numFeatures = numFeatures)
 
-/** Use Lucene StandardAnalyzer to tokenize text **/
- def tokenize(content: String): Seq[String] = {
-    val tReader = new StringReader(content)
-    val analyzer = new StandardAnalyzer()
-    val tStream = analyzer.tokenStream("contents", tReader)
-    val term = tStream.addAttribute(classOf[CharTermAttribute])
-    tStream.reset()
-
-    val result = mutable.ArrayBuffer.empty[String]
-    while (tStream.incrementToken()) {
-      val termValue = term.toString
-
-        result += term.toString
-
-    }
-    result
+ def tokenize(content: String): Array[String] = {
+   val newContent = content.replaceAll("[^0-9a-zA-Z\u4e00-\u9fa5.，,。？“”]+","")
+   val shortContent = if( newContent.length < contentLengthLimit ){ newContent } else { newContent.substring(0, (contentLengthLimit/2).toInt) + newContent.substring(newContent.length - (contentLengthLimit/2).toInt) }
+   ToAnalysis.parse(shortContent).recognition(filter).toStringWithOutNature().split(",")
 }
 
 
   /** Hashing function: Text -> term frequency vector. */
-  def hashTF(text: String): Vector = {
-    val newList : Array[String] = tokenize(text)
-    .filterNot(stopWords.contains(_))
-    .sliding(nGram)
-    .map(_.mkString)
-    .toArray
-
+  def hashTF(text: String): linalg.Vector = {
+    val newList: Array[String] = tokenize(text)
     hasher.transform(newList)
   }
 }

@@ -4,21 +4,19 @@
   "engineFactory": "org.example.textclassification.TextClassificationEngine",
   "datasource": {
     "params": {
-      "appName": "MyTextApp"
+      "appName": "BBSSpam"
     }
   },
   "preparator": {
     "params": {
-      "nGram": 1,
-      "numFeatures": 500,
-      "SPPMI": false
+      "numFeatures": 50000,
     }
   },
   "algorithms": [
     {
-      "name": "lr",
+      "name": "nb",
       "params": {
-        "regParam": 0.00000005
+        "lambda": 1.0
       }
     }
   ]
