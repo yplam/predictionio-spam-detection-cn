@@ -9,7 +9,8 @@
   },
   "preparator": {
     "params": {
-      "numFeatures": 50000,
+      "numFeatures": 100000,
+      "contentLengthLimit": 1000
     }
   },
   "algorithms": [

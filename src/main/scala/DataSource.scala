@@ -5,11 +5,10 @@ import org.apache.predictionio.controller.EmptyEvaluationInfo
 import org.apache.predictionio.controller.Params
 import org.apache.predictionio.controller.SanityCheck
 import org.apache.predictionio.data.store.PEventStore
-
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-
 import grizzled.slf4j.Logger
+import org.jsoup.Jsoup
 
 /** Define Data Source parameters.
   * appName is the application name.
@@ -44,9 +43,9 @@ class DataSource (
     )(sc).map(e => {
       val label : String = e.properties.get[String]("label")
       Observation(
-        if (label == "spam") 1.0 else 0.0,
+        label.toDouble,
         e.properties.get[String]("text"),
-        label
+        if(label.toInt == 0) "notspam" else "spam"
       )
     }).cache
   }
@@ -120,11 +119,11 @@ class TrainingData(
   /** Sanity check to make sure your data is being fed in correctly. */
   def sanityCheck(): Unit = {
     try {
-      val obs : Array[Double] = data.takeSample(false, 5).map(_.label)
+      val obs = data.takeSample(false, 50)
 
       println()
-      (0 until 5).foreach(
-        k => println("Observation " + (k + 1) +" label: " + obs(k))
+      (0 until 50).foreach(
+        k => println("Observation " + (k + 1) +" label: " + obs(k).label + " content: " + Jsoup.parse(obs(k).text).text().replaceAll("[^0-9a-zA-Z\u4e00-\u9fa5.，,。？“”]+",""))
       )
       println()
     } catch {

@@ -2,18 +2,18 @@ package org.example.textclassification
 
 import org.apache.predictionio.controller.PPreparator
 import org.apache.predictionio.controller.Params
-
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
-import org.apache.spark.mllib.feature.{IDF, IDFModel, HashingTF}
+import org.apache.spark.mllib.feature.{HashingTF, IDF, IDFModel}
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
-
 import org.ansj.recognition.impl.StopRecognition
 import org.ansj.splitWord.analysis.ToAnalysis
+import org.jsoup.Jsoup
+
 import collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 
@@ -22,8 +22,8 @@ import scala.collection.mutable.ArrayBuffer
   * components.
   */
 case class PreparatorParams(
-  numFeatures: Int = 15000,
-  contentLengthLimit: Int = 500
+  numFeatures: Int = 100000,
+  contentLengthLimit: Int = 1000
 ) extends Params
 
 /** define your Preparator class */
@@ -73,7 +73,7 @@ class TFHasher(
   private val hasher = new HashingTF(numFeatures = numFeatures)
 
  def tokenize(content: String): Array[String] = {
-   val newContent = content.replaceAll("[^0-9a-zA-Z\u4e00-\u9fa5.，,。？“”]+","")
+   val newContent = Jsoup.parse(content).text().replaceAll("[^0-9a-zA-Z\u4e00-\u9fa5.，,。？、“”]+"," ")
    val shortContent = if( newContent.length < contentLengthLimit ){ newContent } else { newContent.substring(0, (contentLengthLimit/2).toInt) + newContent.substring(newContent.length - (contentLengthLimit/2).toInt) }
    ToAnalysis.parse(shortContent).recognition(filter).toStringWithOutNature().split(",")
 }
